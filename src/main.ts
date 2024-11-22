@@ -21,71 +21,48 @@ const ctx = canvas.getContext("2d")!;
 ctx.strokeStyle = "#000000";
 ctx.lineWidth = 2;
 
-// Data strucutre to store drawing points
-// Each arrray represents a line, and each contain points [x, y]
-const drawingLines: Array<Array<{ x: number; y: number }>> = [];
-
-// Current line being drawn
+// Data structure to store drawing lines and points
+const lines: Array<Array<{ x: number; y: number }>> = [];
+const redoStack: Array<Array<{ x: number; y: number }>> = [];
 let currentLine: Array<{ x: number; y: number }> = [];
+let isDrawing = false; // Tracks if user is actively drawing
 
-// State variable to track drawing
-let isDrawing = false;
-
-// Start Drawing
+// Start Drawing: initialize a new line and add the first point
 canvas.addEventListener("mousedown", (event) => {
     isDrawing = true; 
-
     currentLine = [];
-    drawingLines.push(currentLine);
-    // Add first point to the current line
-    currentLine.push({ x: event.offsetX, y: event.offsetY });
-    // Dispatch the "drawing-changed" event
+    lines.push(currentLine);
+    redoStack.length = 0; // Clear the redo stack when starting a new drawing
     canvas.dispatchEvent(new Event("drawing-changed"));
-
-    // ctx.beginPath();
-    // ctx.moveTo(event.offsetX, event.offsetY);
 });
 
-// Drawing 
+// Continue Drawing: add points as mouse moves
 canvas.addEventListener('mousemove', (event) => {
     if (!isDrawing) return;
-
-    // Add the current point to the line
     currentLine.push({ x: event.offsetX, y: event.offsetY});
-    // Dispatch the "drawing-changed" event
     canvas.dispatchEvent(new Event("drawing-changed"));
-
-    // ctx.lineTo(event.offsetX, event.offsetY);
-    // ctx.stroke();
 });
 
-// Stop Drawing
+// Stop Drawing: finalize the current line
 canvas.addEventListener('mouseup', () => {
     isDrawing = false;
-
-    // Dispatch the "drawing-changed" event
-    canvas.dispatchEvent(new Event("drawing-changed"));
-});
-
-// Observer for the "drawing-changed" event
-canvas.addEventListener("drawing-changed", () => {
-    redrawCanvas();
 });
 
 // Redraw the canvas: clear and redraw all lines
 function redrawCanvas() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
-    for (const line of drawingLines) {
-        if (line.length < 2) continue; // Skip if there's nothing to draw
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    lines.forEach((line) => {
+        if (line.length < 2) return;
         ctx.beginPath();
         ctx.moveTo(line[0].x, line[0].y);
-        for (const point of line) {
-            ctx.lineTo(point.x, point.y);
-        }
+        line.forEach((point) => ctx.lineTo(point.x, point.y));
         ctx.stroke();
         ctx.closePath();
-    }
-};
+    });
+}
+
+// Observer for the "drawing-changed" event
+canvas.addEventListener("drawing-changed", redrawCanvas);
 
 // Create "Clear" button
 const clearButton = document.createElement('button');
@@ -94,6 +71,35 @@ app.append(clearButton);
 
 // Clear button event handler
 clearButton.addEventListener("click", () => {
-    drawingLines.length = 0; // Clear the data structure
+    lines.length = 0; // Clear the data structure
     redrawCanvas();          // Clear the canvas
+    canvas.dispatchEvent(new Event("drawing-changed"));
+});
+
+// Create "Undo" button
+const undoButton = document.createElement("button");
+undoButton.textContent = "Undo";
+app.append(undoButton);
+
+// Undo button event handler
+undoButton.addEventListener("click", () => {
+    if (lines.length > 0) {
+        const lastLine = lines.pop()!;
+        redoStack.push(lastLine); // Move the last line to the redo stack
+        canvas.dispatchEvent(new Event("drawing-changed"));
+    }
+});
+
+// Create "Redo" button
+const redoButton = document.createElement("button");
+redoButton.textContent = "Redo";
+app.append(redoButton);
+
+// Redo button event handler
+redoButton.addEventListener("click", () => {
+    if (redoStack.length > 0) {
+        const lastRedoLine = redoStack.pop()!;
+        lines.push(lastRedoLine); // Move the last redo line back to lines
+        canvas.dispatchEvent(new Event("drawing-changed"));
+    }
 });
