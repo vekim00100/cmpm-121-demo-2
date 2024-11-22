@@ -21,45 +21,44 @@ const ctx = canvas.getContext("2d")!;
 ctx.strokeStyle = "#000000";
 ctx.lineWidth = 2;
 
-interface Drawable {
+interface Line {
+    points: { x: number; y: number }[];
+    thickness: number;
+    drag(x: number, y: number): void;
     display(ctx: CanvasRenderingContext2D): void;
-}
+};
 
-// Define Line Class for drawing and updating the line as the user drags the mouse
-
-class Line implements Drawable {
-    points: { x: number; y: number }[] = [];
-
-    constructor(initialX: number, initialY: number) {
-        this.points.push({ x: initialX, y: initialY });
-    }
-
-    // Add a new point to extend the line
-    drag(x: number, y: number) {
-        this.points.push({ x, y });
-    }
-
-    // Display the line on the canvas
-    display(ctx: CanvasRenderingContext2D) {
-        if (this.points.length < 2) return;
-        ctx.beginPath();
-        ctx.moveTo(this.points[0].x, this.points[0].y);
-        this.points.forEach((point) => ctx.lineTo(point.x, point.y));
-        ctx.stroke();
-        ctx.closePath();
-    }
-}
+// Function to create a new line
+function createLine(initialX: number, initialY: number, thickness: number): Line {
+    return {
+        points: [{ x: initialX, y: initialY }],
+        thickness,
+        drag(x: number, y: number) {
+            this.points.push({ x, y });
+        },
+        display(ctx: CanvasRenderingContext2D) {
+            if (this.points.length < 2) return;
+            ctx.lineWidth = this.thickness;
+            ctx.beginPath();
+            ctx.moveTo(this.points[0].x, this.points[0].y);
+            this.points.forEach((point) => ctx.lineTo(point.x, point.y));
+            ctx.stroke();
+            ctx.closePath();
+        },
+    };
+};
 
 // Data structure to store drawing lines and points
 const drawingLines: Line[] = [];
 const redoStack: Line[] = [];
 let currentLine: Line | null = null;
-let isDrawing = false; // Tracks if user is actively drawing
+let isDrawing = false; 
+let currentThickness= 2;
 
 // Start Drawing: initialize a new line and add the first point
 canvas.addEventListener("mousedown", (event) => {
     isDrawing = true; 
-    currentLine = new Line(event.offsetX, event.offsetY);
+    currentLine = createLine(event.offsetX, event.offsetY, currentThickness);
     drawingLines.push(currentLine);
     redoStack.length = 0; // Clear the redo stack when starting a new drawing
     canvas.dispatchEvent(new Event("drawing-changed"));
@@ -125,4 +124,27 @@ redoButton.addEventListener("click", () => {
         drawingLines.push(lastRedoLine); // Move the last redo line back to lines
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
+});
+
+// Create "Thin" and "Thick" marker buttons
+const thinButton = document.createElement('button');
+thinButton.textContent = "Thin";
+app.append(thinButton);
+
+const thickButton = document.createElement('button');
+thickButton.textContent = "Thick";
+app.append(thickButton);
+
+// Handle "Thin" button click: set the thickness to 2
+thinButton.addEventListener("click", () => {
+    currentThickness = 2;
+    thinButton.classList.add('selectedTool');
+    thickButton.classList.remove('selectedTool');
+});
+
+// Handle "Thick" button click: set the thickness to 5
+thickButton.addEventListener("click", () => {
+    currentThickness = 5;
+    thickButton.classList.add('selectedTool');
+    thinButton.classList.remove('selectedTool');
 });
