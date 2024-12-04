@@ -20,13 +20,15 @@ app.append(canvas);
 const ctx = canvas.getContext("2d")!;
 ctx.strokeStyle = "#000000";
 
-// Data structure to store drawing lines and points
-const drawingLines: Line[] = [];
-const redoStack: Line[] = [];
+// Data structure to store drawing lines, stickers and points
+const drawingLines: (Line | Sticker)[] = [];
+const redoStack: (Line | Sticker)[] = [];
 let currentLine: Line | null = null;
 let isDrawing = false; 
 let currentThickness = 2;
 let toolPreview: ToolPreview | null = null;
+let stickerPreview: StickerPreview | null = null;
+let activeSticker: Sticker | null = null;
 
 interface ToolPreview {
     draw(ctx: CanvasRenderingContext2D, x: number, y: number): void;
@@ -36,6 +38,13 @@ interface Line {
     points: { x: number; y: number }[];
     thickness: number;
     drag(x: number, y: number): void;
+    display(ctx: CanvasRenderingContext2D): void;
+};
+
+interface Sticker {
+    x: number;
+    y: number;
+    emoji: string;
     display(ctx: CanvasRenderingContext2D): void;
 };
 
@@ -59,13 +68,34 @@ function createLine(initialX: number, initialY: number, thickness: number): Line
     };
 };
 
+// Function to create a sticker
+function createSticker(x: number, y: number, emoji: string): Sticker {
+    return {
+        x,
+        y,
+        emoji,
+        display(ctx: CanvasRenderingContext2D) {
+            ctx.font = "30px Arial";
+            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
+        }
+    };
+};
+
 // Start Drawing: initialize a new line and add the first point
 canvas.addEventListener("mousedown", (event) => {
-    isDrawing = true; 
-    currentLine = createLine(event.offsetX, event.offsetY, currentThickness);
-    drawingLines.push(currentLine);
-    redoStack.length = 0; // Clear the redo stack when starting a new drawing
-    canvas.dispatchEvent(new Event("drawing-changed"));
+    if (stickerPreview) {
+        // Place the sticker when clicked
+        const sticker = createSticker(event.offsetX, event.offsetY, stickerPreview.emoji);
+        drawingLines.push(sticker);
+        stickerPreview = null; // Clear the preview after placing the sticker
+        canvas.dispatchEvent(new Event("drawing-changed"));
+    } else {
+        isDrawing = true; 
+        currentLine = createLine(event.offsetX, event.offsetY, currentThickness);
+        drawingLines.push(currentLine);
+        redoStack.length = 0; // Clear the redo stack when starting a new drawing
+        canvas.dispatchEvent(new Event("drawing-changed"));
+    }
 });
 
 // Continue Drawing: add points as mouse moves
@@ -74,11 +104,19 @@ canvas.addEventListener('mousemove', (event) => {
         currentLine.drag(event.offsetX, event.offsetY);
         canvas.dispatchEvent(new Event("drawing-changed"));
     } else if (!isDrawing && toolPreview) {
-         // Draw the tool preview if mouse is not down
-         ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before drawing preview
-         redrawCanvas();
-         toolPreview.draw(ctx, event.offsetX, event.offsetY); // Draw the preview
-         canvas.dispatchEvent(new Event("tool-moved"));
+        // Draw the tool preview if mouse is not down
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before drawing preview
+        redrawCanvas();
+        toolPreview.draw(ctx, event.offsetX, event.offsetY); // Draw the preview
+        canvas.dispatchEvent(new Event("tool-moved"));
+    } else if (!isDrawing && stickerPreview) {
+        // Show the sticker preview as the cursor moves
+        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before drawing preview
+        redrawCanvas();
+        stickerPreview.draw(ctx, event.offsetX, event.offsetY); // Draw the sticker preview
+        stickerPreview.x = event.offsetX;
+        stickerPreview.y = event.offsetY;
+        canvas.dispatchEvent(new Event("tool-moved"));
     };
 });
 
@@ -88,20 +126,26 @@ canvas.addEventListener('mouseup', () => {
     currentLine = null;
 });
 
-// Redraw the canvas: clear and redraw all lines
+// Redraw the canvas: clear and redraw all lines and stickers
 function redrawCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawingLines.forEach((line) => line.display(ctx)); // Call display method for each line
+    drawingLines.forEach((item) => {
+        if ('emoji' in item) {
+            item.display(ctx); // For stickers
+        } else {
+            item.display(ctx); // For lines
+        }
+    });
 }
 
 // Observer for the "drawing-changed" event
 canvas.addEventListener("drawing-changed", redrawCanvas);
 
+// Undo and Redo functionality
 canvas.addEventListener("tool-moved", () => {
     console.log("Tool moved to:");
 });
 
-// Corrected buttonsConfig array
 const buttonsConfig = [
     { text: "Clear Canvas", id: "clear-button" },
     { text: "Undo", id: "undo-button" },
@@ -140,8 +184,8 @@ clearButton.addEventListener("click", () => {
 // Undo button event handler
 undoButton.addEventListener("click", () => {
     if (drawingLines.length > 0) {
-        const lastLine = drawingLines.pop()!;
-        redoStack.push(lastLine); // Move the last line to the redo stack
+        const lastItem = drawingLines.pop()!;
+        redoStack.push(lastItem); // Move the last item to the redo stack
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
 });
@@ -149,8 +193,8 @@ undoButton.addEventListener("click", () => {
 // Redo button event handler
 redoButton.addEventListener("click", () => {
     if (redoStack.length > 0) {
-        const lastRedoLine = redoStack.pop()!;
-        drawingLines.push(lastRedoLine); // Move the last redo line back to lines
+        const lastRedoItem = redoStack.pop()!;
+        drawingLines.push(lastRedoItem); // Move the last redo item back to drawing lines
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
 });
@@ -158,25 +202,38 @@ redoButton.addEventListener("click", () => {
 // Handle "Thin" button click: set the thickness to 2
 thinButton.addEventListener("click", () => {
     currentThickness = 2;
-    // setSelectedTool(thinButton, thickButton);
-    toolPreview = createCirclePreview(currentThickness);
+    toolPreview = createCirclePreview(currentThickness); // This is for drawing tool
     canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
 
 // Handle "Thick" button click: set the thickness to 5
 thickButton.addEventListener("click", () => {
     currentThickness = 5;
-    // setSelectedTool(thickButton, thinButton);
-    toolPreview = createCirclePreview(currentThickness);
+    toolPreview = createCirclePreview(currentThickness); // This is for drawing tool
     canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
 
-// // Helper function to update selected tool appearance
-// function setSelectedTool(selectedButton: HTMLButtonElement, unselectedButton: HTMLButtonElement) {
-//     selectedButton.classList.add('selectedTool');
-//     unselectedButton.classList.remove('selectedTool');
-// };
+// Sticker Buttons (Change these to create the sticker preview)
+catStickerButton.addEventListener("click", () => {
+    stickerPreview = new StickerPreview("🐱");
+    toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
+    canvas.dispatchEvent(new Event("tool-moved"));
+});
 
+appleStickerButton.addEventListener("click", () => {
+    stickerPreview = new StickerPreview("🍎");
+    toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
+    canvas.dispatchEvent(new Event("tool-moved"));
+});
+
+popperStickerButton.addEventListener("click", () => {
+    stickerPreview = new StickerPreview("🎉");
+    toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
+    canvas.dispatchEvent(new Event("tool-moved"));
+});
+
+
+// Function to create a circle preview tool
 function createCirclePreview(thickness: number): ToolPreview {
     return {
         draw(ctx: CanvasRenderingContext2D, x: number, y: number) {
@@ -185,7 +242,25 @@ function createCirclePreview(thickness: number): ToolPreview {
             ctx.stroke();
         }
     };
-};
+}
+
+// Sticker preview class to display emoji
+class StickerPreview implements ToolPreview {
+    emoji: string;
+    x: number = 0;
+    y: number = 0;
+
+    constructor(emoji: string) {
+        this.emoji = emoji;
+    }
+
+    draw(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+        this.x = x;
+        this.y = y;
+        ctx.font = "30px Arial";
+        ctx.fillText(this.emoji, x - 15, y + 10);
+    }
+}
 
 // Trigger initial tool preview
 toolPreview = createCirclePreview(currentThickness);
