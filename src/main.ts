@@ -20,6 +20,14 @@ app.append(canvas);
 const ctx = canvas.getContext("2d")!;
 ctx.strokeStyle = "#000000";
 
+// Data structure to store drawing lines and points
+const drawingLines: Line[] = [];
+const redoStack: Line[] = [];
+let currentLine: Line | null = null;
+let isDrawing = false; 
+let currentThickness = 2;
+let toolPreview: ToolPreview | null = null;
+
 interface ToolPreview {
     draw(ctx: CanvasRenderingContext2D, x: number, y: number): void;
 };
@@ -50,16 +58,6 @@ function createLine(initialX: number, initialY: number, thickness: number): Line
         },
     };
 };
-
-// Data structure to store drawing lines and points
-const drawingLines: Line[] = [];
-const redoStack: Line[] = [];
-let currentLine: Line | null = null;
-let isDrawing = false; 
-let currentThickness= 2;
-
-// Global variable to store the current tool preview object
-let toolPreview: ToolPreview | null = null;
 
 // Start Drawing: initialize a new line and add the first point
 canvas.addEventListener("mousedown", (event) => {
@@ -103,18 +101,34 @@ canvas.addEventListener("tool-moved", () => {
     console.log("Tool moved to:");
 });
 
-// Helper function to create buttons
-function createButton(text: string): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.textContent = text;
-    app.append(button);
-    return button;
-};
+// Corrected buttonsConfig array
+const buttonsConfig = [
+    { text: "Clear Canvas", id: "clear-button" },
+    { text: "Undo", id: "undo-button" },
+    { text: "Redo", id: "redo-button" },
+    { text: "Thin", id: "thin-button" },
+    { text: "Thick", id: "thick-button" },
+    { text: "🐱", id: "cat-sticker" },
+    { text: "🍎", id: "apple-sticker" },
+    { text: "🎉", id: "popper-sticker" },
+];
 
-// Create "Clear", "Undo", and "Redo" buttons
-const clearButton = createButton("Clear");
-const undoButton = createButton("Undo");
-const redoButton = createButton("Redo");
+buttonsConfig.forEach(({ text, id }) => {
+    const button = document.createElement("button");
+    button.textContent = text;
+    button.id = id;
+    button.style.margin = "10px 5px";
+    app.appendChild(button);
+});
+
+const clearButton = document.getElementById("clear-button")!;
+const undoButton = document.getElementById("undo-button")!;
+const redoButton = document.getElementById("redo-button")!;
+const thinButton = document.getElementById("thin-button")!;
+const thickButton = document.getElementById("thick-button")!;
+const catStickerButton = document.getElementById("cat-sticker")!;
+const appleStickerButton = document.getElementById("apple-sticker")!;
+const popperStickerButton = document.getElementById("popper-sticker")!;
 
 // Clear button event handler
 clearButton.addEventListener("click", () => {
@@ -141,29 +155,27 @@ redoButton.addEventListener("click", () => {
     }
 });
 
-// Create "Thin" and "Thick" marker buttons
-const thinButton = createButton("Thin");
-const thickButton = createButton("Thick");
-
 // Handle "Thin" button click: set the thickness to 2
 thinButton.addEventListener("click", () => {
     currentThickness = 2;
-    setSelectedTool(thinButton, thickButton);
+    // setSelectedTool(thinButton, thickButton);
     toolPreview = createCirclePreview(currentThickness);
+    canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
 
 // Handle "Thick" button click: set the thickness to 5
 thickButton.addEventListener("click", () => {
     currentThickness = 5;
-    setSelectedTool(thickButton, thinButton);
+    // setSelectedTool(thickButton, thinButton);
     toolPreview = createCirclePreview(currentThickness);
+    canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
 
-// Helper function to update selected tool appearance
-function setSelectedTool(selectedButton: HTMLButtonElement, unselectedButton: HTMLButtonElement) {
-    selectedButton.classList.add('selectedTool');
-    unselectedButton.classList.remove('selectedTool');
-};
+// // Helper function to update selected tool appearance
+// function setSelectedTool(selectedButton: HTMLButtonElement, unselectedButton: HTMLButtonElement) {
+//     selectedButton.classList.add('selectedTool');
+//     unselectedButton.classList.remove('selectedTool');
+// };
 
 function createCirclePreview(thickness: number): ToolPreview {
     return {
@@ -174,3 +186,7 @@ function createCirclePreview(thickness: number): ToolPreview {
         }
     };
 };
+
+// Trigger initial tool preview
+toolPreview = createCirclePreview(currentThickness);
+canvas.dispatchEvent(new Event("tool-moved"));
