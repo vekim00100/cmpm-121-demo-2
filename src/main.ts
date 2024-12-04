@@ -1,3 +1,4 @@
+//
 import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -88,6 +89,7 @@ canvas.addEventListener("mousedown", (event) => {
         const sticker = createSticker(event.offsetX, event.offsetY, stickerPreview.emoji);
         drawingLines.push(sticker);
         stickerPreview = null; // Clear the preview after placing the sticker
+        toolPreview = createCirclePreview(currentThickness); // Reset the preview to the default tool
         canvas.dispatchEvent(new Event("drawing-changed"));
     } else {
         isDrawing = true; 
