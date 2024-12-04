@@ -1,4 +1,3 @@
-//
 import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -21,33 +20,41 @@ app.append(canvas);
 const ctx = canvas.getContext("2d")!;
 ctx.strokeStyle = "#000000";
 
-// Data structure to store drawing lines, stickers and points
+// Data structure to store drawing lines, stickers, and points
 const drawingLines: (Line | Sticker)[] = [];
 const redoStack: (Line | Sticker)[] = [];
 let currentLine: Line | null = null;
-let isDrawing = false; 
+let isDrawing = false;
 let currentThickness = 2;
 let toolPreview: ToolPreview | null = null;
 let stickerPreview: StickerPreview | null = null;
 let activeSticker: Sticker | null = null;
 
+// Data-driven sticker set
+const initialStickers: Sticker[] = [
+    { emoji: "🐱" },
+    { emoji: "🍎" },
+    { emoji: "🎉" },
+];
+
+// Interface definitions
 interface ToolPreview {
     draw(ctx: CanvasRenderingContext2D, x: number, y: number): void;
-};
+}
 
 interface Line {
     points: { x: number; y: number }[];
     thickness: number;
     drag(x: number, y: number): void;
     display(ctx: CanvasRenderingContext2D): void;
-};
+}
 
 interface Sticker {
     x: number;
     y: number;
     emoji: string;
     display(ctx: CanvasRenderingContext2D): void;
-};
+}
 
 // Function to create a new line
 function createLine(initialX: number, initialY: number, thickness: number): Line {
@@ -67,7 +74,7 @@ function createLine(initialX: number, initialY: number, thickness: number): Line
             ctx.closePath();
         },
     };
-};
+}
 
 // Function to create a sticker
 function createSticker(x: number, y: number, emoji: string): Sticker {
@@ -80,7 +87,7 @@ function createSticker(x: number, y: number, emoji: string): Sticker {
             ctx.fillText(this.emoji, this.x - 15, this.y + 10);
         }
     };
-};
+}
 
 // Start Drawing: initialize a new line and add the first point
 canvas.addEventListener("mousedown", (event) => {
@@ -92,7 +99,7 @@ canvas.addEventListener("mousedown", (event) => {
         toolPreview = createCirclePreview(currentThickness); // Reset the preview to the default tool
         canvas.dispatchEvent(new Event("drawing-changed"));
     } else {
-        isDrawing = true; 
+        isDrawing = true;
         currentLine = createLine(event.offsetX, event.offsetY, currentThickness);
         drawingLines.push(currentLine);
         redoStack.length = 0; // Clear the redo stack when starting a new drawing
@@ -119,7 +126,7 @@ canvas.addEventListener('mousemove', (event) => {
         stickerPreview.x = event.offsetX;
         stickerPreview.y = event.offsetY;
         canvas.dispatchEvent(new Event("tool-moved"));
-    };
+    }
 });
 
 // Stop Drawing: finalize the current line
@@ -148,15 +155,15 @@ canvas.addEventListener("tool-moved", () => {
     console.log("Tool moved to:");
 });
 
+// Create buttons dynamically based on initial stickers and options
 const buttonsConfig = [
     { text: "Clear Canvas", id: "clear-button" },
     { text: "Undo", id: "undo-button" },
     { text: "Redo", id: "redo-button" },
     { text: "Thin", id: "thin-button" },
     { text: "Thick", id: "thick-button" },
-    { text: "🐱", id: "cat-sticker" },
-    { text: "🍎", id: "apple-sticker" },
-    { text: "🎉", id: "popper-sticker" },
+    ...initialStickers.map(sticker => ({ text: sticker.emoji, id: `${sticker.emoji}-sticker` })),
+    { text: "Create Custom Sticker", id: "create-sticker-button" },
 ];
 
 buttonsConfig.forEach(({ text, id }) => {
@@ -172,9 +179,7 @@ const undoButton = document.getElementById("undo-button")!;
 const redoButton = document.getElementById("redo-button")!;
 const thinButton = document.getElementById("thin-button")!;
 const thickButton = document.getElementById("thick-button")!;
-const catStickerButton = document.getElementById("cat-sticker")!;
-const appleStickerButton = document.getElementById("apple-sticker")!;
-const popperStickerButton = document.getElementById("popper-sticker")!;
+const createStickerButton = document.getElementById("create-sticker-button")!;
 
 // Clear button event handler
 clearButton.addEventListener("click", () => {
@@ -215,25 +220,34 @@ thickButton.addEventListener("click", () => {
     canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
 
-// Sticker Buttons (Change these to create the sticker preview)
-catStickerButton.addEventListener("click", () => {
-    stickerPreview = new StickerPreview("🐱");
-    toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
-    canvas.dispatchEvent(new Event("tool-moved"));
+// Function to handle custom sticker creation
+createStickerButton.addEventListener("click", () => {
+    const customEmoji = prompt("Enter custom emoji for sticker:", "");
+    if (customEmoji) {
+        initialStickers.push({ emoji: customEmoji }); // Add the custom sticker to the list
+        const customStickerButton = document.createElement("button");
+        customStickerButton.textContent = customEmoji;
+        customStickerButton.id = `${customEmoji}-sticker`;
+        customStickerButton.style.margin = "10px 5px";
+        app.appendChild(customStickerButton);
+
+        customStickerButton.addEventListener("click", () => {
+            stickerPreview = new StickerPreview(customEmoji);
+            toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
+            canvas.dispatchEvent(new Event("tool-moved"));
+        });
+    }
 });
 
-appleStickerButton.addEventListener("click", () => {
-    stickerPreview = new StickerPreview("🍎");
-    toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
-    canvas.dispatchEvent(new Event("tool-moved"));
+// Sticker Buttons (Change these to create the sticker preview dynamically)
+initialStickers.forEach((sticker) => {
+    const stickerButton = document.getElementById(`${sticker.emoji}-sticker`)!;
+    stickerButton.addEventListener("click", () => {
+        stickerPreview = new StickerPreview(sticker.emoji);
+        toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
+        canvas.dispatchEvent(new Event("tool-moved"));
+    });
 });
-
-popperStickerButton.addEventListener("click", () => {
-    stickerPreview = new StickerPreview("🎉");
-    toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
-    canvas.dispatchEvent(new Event("tool-moved"));
-});
-
 
 // Function to create a circle preview tool
 function createCirclePreview(thickness: number): ToolPreview {
