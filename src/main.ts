@@ -278,6 +278,41 @@ class StickerPreview implements ToolPreview {
     }
 }
 
+// Add Export button
+const exportButton = document.createElement("button");
+exportButton.textContent = "Export";
+exportButton.id = "export-button";
+exportButton.style.margin = "10px 5px";
+app.appendChild(exportButton);
+
+exportButton.addEventListener("click", () => {
+    // Create a temporary canvas
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = 1024;
+    exportCanvas.height = 1024;
+    const exportCtx = exportCanvas.getContext("2d")!;
+
+    // Set background color (e.g., white) or add a background image
+    exportCtx.fillStyle = "#ffffff"; // Change to any color you'd like
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+    // Scale the context to fit 4x size
+    const scaleFactor = exportCanvas.width / canvas.width;
+    exportCtx.scale(scaleFactor, scaleFactor);
+
+    // Redraw all drawing commands on the new canvas
+    drawingLines.forEach((item) => {
+        item.display(exportCtx);
+    });
+
+    // Export the canvas as a PNG file
+    const anchor = document.createElement("a");
+    anchor.href = exportCanvas.toDataURL("image/png");
+    anchor.download = "sketchpad.png";
+    anchor.click();
+});
+
+
 // Trigger initial tool preview
 toolPreview = createCirclePreview(currentThickness);
 canvas.dispatchEvent(new Event("tool-moved"));
