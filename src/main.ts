@@ -1,3 +1,4 @@
+//
 import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -16,6 +17,11 @@ canvas.width = 256;
 canvas.height = 256;
 app.append(canvas);
 
+// Create button container
+const buttonContainer = document.createElement("div");
+buttonContainer.id = "button-container";
+app.appendChild(buttonContainer);
+
 // Canvas drawing context
 const ctx = canvas.getContext("2d")!;
 ctx.strokeStyle = "#000000";
@@ -28,13 +34,36 @@ let isDrawing = false;
 let currentThickness = 2;
 let toolPreview: ToolPreview | null = null;
 let stickerPreview: StickerPreview | null = null;
-let activeSticker: Sticker | null = null;
 
 // Data-driven sticker set
 const initialStickers: Sticker[] = [
-    { emoji: "🐱" },
-    { emoji: "🍎" },
-    { emoji: "🎉" },
+    { 
+        x: 0, 
+        y: 0, 
+        emoji: "🐱", 
+        display(ctx: CanvasRenderingContext2D) {
+            ctx.font = "30px Arial";
+            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
+        } 
+    },
+    { 
+        x: 0, 
+        y: 0, 
+        emoji: "🍎", 
+        display(ctx: CanvasRenderingContext2D) {
+            ctx.font = "30px Arial";
+            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
+        } 
+    },
+    { 
+        x: 0, 
+        y: 0, 
+        emoji: "🎉", 
+        display(ctx: CanvasRenderingContext2D) {
+            ctx.font = "30px Arial";
+            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
+        } 
+    },
 ];
 
 // Interface definitions
@@ -157,7 +186,7 @@ canvas.addEventListener("tool-moved", () => {
 
 // Create buttons dynamically based on initial stickers and options
 const buttonsConfig = [
-    { text: "Clear Canvas", id: "clear-button" },
+    { text: "Clear", id: "clear-button" },
     { text: "Undo", id: "undo-button" },
     { text: "Redo", id: "redo-button" },
     { text: "Thin", id: "thin-button" },
@@ -208,14 +237,14 @@ redoButton.addEventListener("click", () => {
 
 // Handle "Thin" button click: set the thickness to 2
 thinButton.addEventListener("click", () => {
-    currentThickness = 2;
+    currentThickness = 1;
     toolPreview = createCirclePreview(currentThickness); // This is for drawing tool
     canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
 
 // Handle "Thick" button click: set the thickness to 5
 thickButton.addEventListener("click", () => {
-    currentThickness = 5;
+    currentThickness = 4;
     toolPreview = createCirclePreview(currentThickness); // This is for drawing tool
     canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
@@ -224,13 +253,28 @@ thickButton.addEventListener("click", () => {
 createStickerButton.addEventListener("click", () => {
     const customEmoji = prompt("Enter custom emoji for sticker:", "");
     if (customEmoji) {
-        initialStickers.push({ emoji: customEmoji }); // Add the custom sticker to the list
+        // Create a complete Sticker object
+        const customSticker = {
+            x: 0,
+            y: 0,
+            emoji: customEmoji,
+            display(ctx: CanvasRenderingContext2D) {
+                ctx.font = "30px Arial";
+                ctx.fillText(this.emoji, this.x - 15, this.y + 10);
+            }
+        };
+
+        // Add the custom sticker to the list
+        initialStickers.push(customSticker);
+
+        // Create a button for the custom sticker
         const customStickerButton = document.createElement("button");
         customStickerButton.textContent = customEmoji;
         customStickerButton.id = `${customEmoji}-sticker`;
         customStickerButton.style.margin = "10px 5px";
         app.appendChild(customStickerButton);
 
+        // Add an event listener for the new sticker button
         customStickerButton.addEventListener("click", () => {
             stickerPreview = new StickerPreview(customEmoji);
             toolPreview = stickerPreview; // Set toolPreview to be the sticker preview
