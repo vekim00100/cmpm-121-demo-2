@@ -34,6 +34,24 @@ let currentThickness = 2;
 let toolPreview: ToolPreview | null = null;
 let stickerPreview: StickerPreview | null = null;
 
+
+function drawDefaultContent() {
+    const message = "Welcome to Sticker Sketchpad!";
+    ctx.font = "15px Arial";
+    ctx.fillStyle = "#888888"; // Light gray text
+
+    // Calculate the width of the text to center it
+    const textWidth = ctx.measureText(message).width;  
+    const x = (canvas.width - textWidth) / 2;  
+    const y = canvas.height / 2;  
+
+    // Draw the text using the calculated position
+    ctx.fillText(message, x, y);
+}
+
+// Call this function on initial load to show the message
+drawDefaultContent();
+
 // Function to display a sticker on the canvas
 function displaySticker(ctx: CanvasRenderingContext2D, emoji: string, x: number, y: number) {
     ctx.font = "30px Arial";
@@ -114,6 +132,9 @@ canvas.addEventListener("mousedown", (event) => {
         redoStack.length = 0; // Clear the redo stack when starting a new drawing
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
+
+    // Clear default content when user starts drawing
+    ctx.clearRect(0, 0, canvas.width, canvas.height); 
 });
 
 // Continue Drawing: add points as mouse moves
@@ -131,6 +152,7 @@ canvas.addEventListener('mousemove', (event) => {
 
 // Stop Drawing: finalize the current line
 canvas.addEventListener('mouseup', () => { isDrawing = false; currentLine = null; });
+
 
 // Redraw the canvas: clear and redraw all lines and stickers
 function redrawCanvas() {
@@ -176,6 +198,7 @@ const createStickerButton = document.getElementById("create-sticker-button")!;
 clearButton.addEventListener("click", () => {
     drawingLines.length = 0; // Clear the data structure
     redrawCanvas();          // Clear the canvas
+    drawDefaultContent();    // Show the default content again
     canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
