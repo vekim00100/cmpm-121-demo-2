@@ -34,35 +34,17 @@ let currentThickness = 2;
 let toolPreview: ToolPreview | null = null;
 let stickerPreview: StickerPreview | null = null;
 
+// Function to display a sticker on the canvas
+function displaySticker(ctx: CanvasRenderingContext2D, emoji: string, x: number, y: number) {
+    ctx.font = "30px Arial";
+    ctx.fillText(emoji, x - 15, y + 10);
+}
+
 // Data-driven sticker set
 const initialStickers: Sticker[] = [
-    { 
-        x: 0, 
-        y: 0, 
-        emoji: "🐱", 
-        display(ctx: CanvasRenderingContext2D) {
-            ctx.font = "30px Arial";
-            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
-        } 
-    },
-    { 
-        x: 0, 
-        y: 0, 
-        emoji: "🍎", 
-        display(ctx: CanvasRenderingContext2D) {
-            ctx.font = "30px Arial";
-            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
-        } 
-    },
-    { 
-        x: 0, 
-        y: 0, 
-        emoji: "🎉", 
-        display(ctx: CanvasRenderingContext2D) {
-            ctx.font = "30px Arial";
-            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
-        } 
-    },
+    { x: 0, y: 0, emoji: "🐱", display(ctx) { displaySticker(ctx, this.emoji, this.x, this.y); } },
+    { x: 0, y: 0, emoji: "🍎", display(ctx) { displaySticker(ctx, this.emoji, this.x, this.y); } },
+    { x: 0, y: 0, emoji: "🎉", display(ctx) { displaySticker(ctx, this.emoji, this.x, this.y); } },
 ];
 
 // Interface definitions
@@ -92,10 +74,8 @@ function createLine(initialX: number, initialY: number, thickness: number): Line
         points: [{ x: initialX, y: initialY }],
         thickness,
         color, // Store color for the line
-        drag(x: number, y: number) {
-            this.points.push({ x, y });
-        },
-        display(ctx: CanvasRenderingContext2D) {
+        drag(x, y) { this.points.push({ x, y }); },
+        display(ctx) {
             if (this.points.length < 2) return;
             ctx.lineWidth = this.thickness;
             ctx.strokeStyle = this.color; // Apply color here when drawing the line
@@ -114,10 +94,7 @@ function createSticker(x: number, y: number, emoji: string): Sticker {
         x,
         y,
         emoji,
-        display(ctx: CanvasRenderingContext2D) {
-            ctx.font = "30px Arial";
-            ctx.fillText(this.emoji, this.x - 15, this.y + 10);
-        }
+        display(ctx) { displaySticker(ctx, this.emoji, this.x, this.y); },
     };
 }
 
@@ -132,8 +109,6 @@ canvas.addEventListener("mousedown", (event) => {
         canvas.dispatchEvent(new Event("drawing-changed"));
     } else {
         isDrawing = true;
-        // Set a random color for the new line
-        ctx.strokeStyle = getRandomColor();
         currentLine = createLine(event.offsetX, event.offsetY, currentThickness);
         drawingLines.push(currentLine);
         redoStack.length = 0; // Clear the redo stack when starting a new drawing
@@ -141,45 +116,26 @@ canvas.addEventListener("mousedown", (event) => {
     }
 });
 
-
 // Continue Drawing: add points as mouse moves
 canvas.addEventListener('mousemove', (event) => {
     if (isDrawing && currentLine) {
         currentLine.drag(event.offsetX, event.offsetY);
         canvas.dispatchEvent(new Event("drawing-changed"));
-    } else if (!isDrawing && toolPreview) {
-        // Draw the tool preview if mouse is not down
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before drawing preview
+    } else if (toolPreview || stickerPreview) {
+        // Show the preview
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         redrawCanvas();
-        toolPreview.draw(ctx, event.offsetX, event.offsetY); // Draw the preview
-        canvas.dispatchEvent(new Event("tool-moved"));
-    } else if (!isDrawing && stickerPreview) {
-        // Show the sticker preview as the cursor moves
-        ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas before drawing preview
-        redrawCanvas();
-        stickerPreview.draw(ctx, event.offsetX, event.offsetY); // Draw the sticker preview
-        stickerPreview.x = event.offsetX;
-        stickerPreview.y = event.offsetY;
-        canvas.dispatchEvent(new Event("tool-moved"));
+        (toolPreview || stickerPreview)?.draw(ctx, event.offsetX, event.offsetY);
     }
 });
 
 // Stop Drawing: finalize the current line
-canvas.addEventListener('mouseup', () => {
-    isDrawing = false;
-    currentLine = null;
-});
+canvas.addEventListener('mouseup', () => { isDrawing = false; currentLine = null; });
 
 // Redraw the canvas: clear and redraw all lines and stickers
 function redrawCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawingLines.forEach((item) => {
-        if ('emoji' in item) {
-            item.display(ctx); // For stickers
-        } else {
-            item.display(ctx); // For lines
-        }
-    });
+    drawingLines.forEach((item) => item.display(ctx));
 }
 
 // Observer for the "drawing-changed" event
@@ -289,7 +245,7 @@ createStickerButton.addEventListener("click", () => {
     }
 });
 
-// Sticker Buttons (Change these to create the sticker preview dynamically)
+// Initial sticker buttons
 initialStickers.forEach((sticker) => {
     const stickerButton = document.getElementById(`${sticker.emoji}-sticker`)!;
     stickerButton.addEventListener("click", () => {
@@ -299,80 +255,32 @@ initialStickers.forEach((sticker) => {
     });
 });
 
-// Function to create a circle preview tool
+// Tool preview for stickers
+class StickerPreview implements ToolPreview {
+    emoji: string;
+    constructor(emoji: string) { this.emoji = emoji; }
+    draw(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+        displaySticker(ctx, this.emoji, x, y);
+    }
+}
+
+// Tool preview for drawing (a circle preview)
 function createCirclePreview(thickness: number): ToolPreview {
     return {
-        draw(ctx: CanvasRenderingContext2D, x: number, y: number) {
+        draw(ctx, x, y) {
             ctx.beginPath();
-            ctx.arc(x, y, thickness / 2, 0, Math.PI * 2); // Draw circle with radius based on thickness
+            ctx.arc(x, y, thickness, 0, 2 * Math.PI);
             ctx.stroke();
         }
     };
 }
 
-// Sticker preview class to display emoji
-class StickerPreview implements ToolPreview {
-    emoji: string;
-    x: number = 0;
-    y: number = 0;
-
-    constructor(emoji: string) {
-        this.emoji = emoji;
-    }
-
-    draw(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-        this.x = x;
-        this.y = y;
-        ctx.font = "30px Arial";
-        ctx.fillText(this.emoji, x - 15, y + 10);
-    }
-}
-
-// Add Export button
-const exportButton = document.createElement("button");
-exportButton.textContent = "Export";
-exportButton.id = "export-button";
-exportButton.style.margin = "10px 5px";
-app.appendChild(exportButton);
-
-exportButton.addEventListener("click", () => {
-    // Create a temporary canvas
-    const exportCanvas = document.createElement("canvas");
-    exportCanvas.width = 1024;
-    exportCanvas.height = 1024;
-    const exportCtx = exportCanvas.getContext("2d")!;
-
-    // Set background color (e.g., white) or add a background image
-    exportCtx.fillStyle = "#ffffff"; // Change to any color you'd like
-    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-
-    // Scale the context to fit 4x size
-    const scaleFactor = exportCanvas.width / canvas.width;
-    exportCtx.scale(scaleFactor, scaleFactor);
-
-    // Redraw all drawing commands on the new canvas
-    drawingLines.forEach((item) => {
-        item.display(exportCtx);
-    });
-
-    // Export the canvas as a PNG file
-    const anchor = document.createElement("a");
-    anchor.href = exportCanvas.toDataURL("image/png");
-    anchor.download = "sketchpad.png";
-    anchor.click();
-});
-
-
-// Trigger initial tool preview
-toolPreview = createCirclePreview(currentThickness);
-canvas.dispatchEvent(new Event("tool-moved"));
-
-function getRandomColor() {
-    const letters = '0123456789ABCDEF';
-    let color = '#';
+// Random color generator
+function getRandomColor(): string {
+    const letters = "0123456789ABCDEF";
+    let color = "#";
     for (let i = 0; i < 6; i++) {
         color += letters[Math.floor(Math.random() * 16)];
     }
     return color;
 }
-
