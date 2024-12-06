@@ -1,4 +1,3 @@
-//
 import "./style.css";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -74,6 +73,7 @@ interface ToolPreview {
 interface Line {
     points: { x: number; y: number }[];
     thickness: number;
+    color: string; // Store color for each line
     drag(x: number, y: number): void;
     display(ctx: CanvasRenderingContext2D): void;
 }
@@ -87,15 +87,18 @@ interface Sticker {
 
 // Function to create a new line
 function createLine(initialX: number, initialY: number, thickness: number): Line {
+    const color = getRandomColor(); // Set color when the line is created
     return {
         points: [{ x: initialX, y: initialY }],
         thickness,
+        color, // Store color for the line
         drag(x: number, y: number) {
             this.points.push({ x, y });
         },
         display(ctx: CanvasRenderingContext2D) {
             if (this.points.length < 2) return;
             ctx.lineWidth = this.thickness;
+            ctx.strokeStyle = this.color; // Apply color here when drawing the line
             ctx.beginPath();
             ctx.moveTo(this.points[0].x, this.points[0].y);
             this.points.forEach((point) => ctx.lineTo(point.x, point.y));
@@ -129,12 +132,15 @@ canvas.addEventListener("mousedown", (event) => {
         canvas.dispatchEvent(new Event("drawing-changed"));
     } else {
         isDrawing = true;
+        // Set a random color for the new line
+        ctx.strokeStyle = getRandomColor();
         currentLine = createLine(event.offsetX, event.offsetY, currentThickness);
         drawingLines.push(currentLine);
         redoStack.length = 0; // Clear the redo stack when starting a new drawing
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
 });
+
 
 // Continue Drawing: add points as mouse moves
 canvas.addEventListener('mousemove', (event) => {
@@ -237,7 +243,7 @@ redoButton.addEventListener("click", () => {
 
 // Handle "Thin" button click: set the thickness to 2
 thinButton.addEventListener("click", () => {
-    currentThickness = 1;
+    currentThickness = 2;
     toolPreview = createCirclePreview(currentThickness); // This is for drawing tool
     canvas.dispatchEvent(new Event("tool-moved")); // Trigger tool-moved immediately
 });
@@ -360,3 +366,13 @@ exportButton.addEventListener("click", () => {
 // Trigger initial tool preview
 toolPreview = createCirclePreview(currentThickness);
 canvas.dispatchEvent(new Event("tool-moved"));
+
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+
